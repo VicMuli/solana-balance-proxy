@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const https = require("https");
+const fetch = require("node-fetch");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +10,7 @@ app.use(cors());
 
 app.get("/get-balance", async (req, res) => {
   const { wallet, timestamp } = req.query;
+
   if (!wallet || !API_KEY) {
     return res.status(400).json({ error: "Missing wallet or API_KEY" });
   }
@@ -17,20 +18,23 @@ app.get("/get-balance", async (req, res) => {
   const baseUrl = `https://mainnet.helius.xyz/v0/addresses/${wallet}/balances?api-key=${API_KEY}`;
   const fullUrl = timestamp ? `${baseUrl}&timestamp=${timestamp}` : baseUrl;
 
-  https.get(fullUrl, (response) => {
-    let data = "";
-    response.on("data", chunk => data += chunk);
-    response.on("end", () => {
-      try {
-        const json = JSON.parse(data);
-        res.json(json);
-      } catch (e) {
-        res.status(500).json({ error: "Failed to parse response" });
-      }
-    });
-  }).on("error", (err) => {
-    res.status(500).json({ error: "HTTPS request failed" });
-  });
+  try {
+    console.log("🔗 Fetching from:", fullUrl);
+
+    const response = await fetch(fullUrl);
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Helius Error Response:", data);
+      return res.status(500).json({ error: data });
+    }
+
+    console.log("✅ Helius Data:", data);
+    res.json(data);
+  } catch (error) {
+    console.error("❌ Fetch Error:", error);
+    res.status(500).json({ error: "Fetch failed: " + error.message });
+  }
 });
 
 app.listen(PORT, () => {
